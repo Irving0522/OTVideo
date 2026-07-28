@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>治療師 POV — 影片 × 多模態時間軸</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F8FA; --panel:#FFFFFF; --ink:#161C27; --muted:#6B7686;
+    --hair:#E3E7EE; --hair2:#EFF2F6;
+    --emo-neutral:#94A0B3; --emo-happiness:#E39B2E; --emo-sadness:#4F79C7;
+    --emo-anger:#D24E39; --emo-surprise:#8A6FC9; --emo-disgust:#5FA65C;
+    --emo-fear:#C77FB0; --emo-contempt:#B08A4A; --emo-uncertain:#C6CCD6;
+    --eye:#1F9D6B; --eye-off:#D7DCE4; --speech:#2585A0; --pause:#E0A020;
+    --cursor:#0E2A38; --node:#12B5D6;
+    --shadow:0 1px 2px rgba(20,28,39,.05),0 8px 24px rgba(20,28,39,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#0E1319; --panel:#151B23; --ink:#E7ECF3; --muted:#8A96A8;
+      --hair:#242C37; --hair2:#1C232C; --eye-off:#2A323D; --cursor:#7FE3FF;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 30px rgba(0,0,0,.35);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:24px}
+  .wrap{max-width:1080px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  h1{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:26px;
+    letter-spacing:-.01em;margin:0}
+  h1 .thin{color:var(--muted);font-weight:400}
+  .load{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;
+    border:1px solid var(--hair);background:var(--panel);color:var(--ink);
+    padding:9px 14px;border-radius:9px;cursor:pointer;box-shadow:var(--shadow)}
+  .btn:hover{border-color:var(--muted)} .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  input[type=file]{display:none}
+  .datatag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin:12px 0 4px}
+  .datatag b{color:var(--eye)}
+  .err{color:var(--emo-anger);font-family:'IBM Plex Mono',monospace;font-size:12px;min-height:16px;margin:6px 0}
+
+  .stage{display:grid;grid-template-columns:minmax(260px,1fr) 1.2fr;gap:16px;margin-top:8px}
+  @media(max-width:820px){.stage{grid-template-columns:1fr}}
+  .vidbox{background:#000;border:1px solid var(--hair);border-radius:14px;overflow:hidden;
+    box-shadow:var(--shadow);position:relative;aspect-ratio:4/3;display:grid;place-items:center}
+  video{width:100%;height:100%;object-fit:contain;background:#000}
+  .vidhint{color:#8A96A8;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;padding:20px;line-height:1.7}
+  .vidhint .big{font-size:26px;color:#c4ccd6;margin-bottom:8px}
+
+  .board{background:var(--panel);border:1px solid var(--hair);border-radius:14px;
+    box-shadow:var(--shadow);padding:16px}
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .rcell{border:1px solid var(--hair);border-radius:10px;padding:8px 11px;background:var(--paper)}
+  .rlabel{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted)}
+  .rval{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;margin-top:3px;
+    display:flex;align-items:center;gap:7px;min-height:22px}
+  .rcell.time .rval{font-family:'IBM Plex Mono',monospace}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .rval .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  svg{display:block;width:100%;height:auto;touch-action:none}
+  .lane-label{font-family:'IBM Plex Mono',monospace;font-size:10px;fill:var(--muted)}
+  .tick-label{font-family:'IBM Plex Mono',monospace;font-size:9px;fill:var(--muted)}
+  .axis-line{stroke:var(--hair)} .grid-line{stroke:var(--hair2)} .lane-bg{fill:var(--paper)}
+  .cursor-line{stroke:var(--cursor);stroke-width:1.5} .cursor-node{fill:var(--node);stroke:var(--panel);stroke-width:2}
+
+  .controls{display:flex;align-items:center;gap:12px;padding:10px 2px 4px}
+  .play{width:36px;height:36px;border-radius:50%;border:1px solid var(--hair);
+    background:var(--ink);color:var(--paper);cursor:pointer;display:grid;place-items:center;flex:none}
+  .play:active{transform:translateY(1px)}
+  .scrub{flex:1} input[type=range]{width:100%;accent-color:var(--node)}
+  .offset{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;
+    font-size:11px;color:var(--muted);padding:4px 2px 0}
+  .offset input{width:80px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+    border:1px solid var(--hair);border-radius:6px;padding:4px 6px;background:var(--panel);color:var(--ink)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;padding:8px 2px 0}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .sw{width:10px;height:10px;border-radius:3px;flex:none}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:18px}
+  .stat{background:var(--panel);border:1px solid var(--hair);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
+  .stat .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;margin-top:4px}
+  .stat .s{font-size:12px;color:var(--muted);margin-top:2px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:18px;line-height:1.6}
+  .note code{font-family:'IBM Plex Mono',monospace;background:var(--hair2);padding:1px 5px;border-radius:4px}
+  .note b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">治療師 POV · 影片同步</p>
+      <h1>影片 × 反應時間軸 <span class="thin">/ synced playback</span></h1>
+    </div>
+    <div class="load">
+      <label class="btn primary" for="vid">載入影片</label>
+      <input type="file" id="vid" accept="video/*">
+      <label class="btn" for="files">載入 CSV</label>
+      <input type="file" id="files" accept=".csv" multiple>
+      <button class="btn" id="sampleBtn">看範例</button>
+    </div>
+  </header>
+  <p class="datatag" id="datatag">目前:<b>範例資料</b>,尚未載入影片。載入影片與 CSV 後,兩者會同步播放。</p>
+  <div class="err" id="err"></div>
+
+  <div class="stage">
+    <div class="vidbox" id="vidbox">
+      <div class="vidhint" id="vidhint"><div class="big">▶</div>載入影片後<br>會與時間軸同步播放</div>
+      <video id="video" playsinline style="display:none"></video>
+    </div>
+
+    <div class="board">
+      <div class="readout">
+        <div class="rcell time"><div class="rlabel">時間 T</div><div class="rval" id="ro-time">—</div></div>
+        <div class="rcell"><div class="rlabel">情緒</div><div class="rval" id="ro-emo">—</div></div>
+        <div class="rcell"><div class="rlabel">眼神接觸</div><div class="rval" id="ro-eye">—</div></div>
+        <div class="rcell"><div class="rlabel">說話</div><div class="rval" id="ro-speech"><span class="txt">—</span></div></div>
+      </div>
+      <svg id="chart" viewBox="0 0 640 300" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="controls">
+        <button class="play" id="play" aria-label="播放"><svg width="13" height="13" viewBox="0 0 14 14" id="playIcon"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg></button>
+        <div class="scrub"><input type="range" id="scrub" min="0" max="1000" value="0"></div>
+      </div>
+      <div class="offset">
+        資料↔影片 對齊偏移
+        <input type="number" id="offset" step="0.1" value="0"> 秒
+        <button class="btn" id="autoOffset" style="padding:4px 9px;font-size:11px">自動對齊</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <p class="note" id="note"></p>
+</div>
+
+<script>
+"use strict";
+const EMO_COLORS={neutral:'--emo-neutral',happiness:'--emo-happiness',sadness:'--emo-sadness',
+  anger:'--emo-anger',surprise:'--emo-surprise',disgust:'--emo-disgust',fear:'--emo-fear',
+  contempt:'--emo-contempt',uncertain:'--emo-uncertain'};
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const emoColor=e=>cssv(EMO_COLORS[e]||'--emo-uncertain');
+
+/* offset: video_time = data_time - OFFSET.  即 OFFSET = 資料起始絕對秒數 */
+let OFFSET=0;
+const video=document.getElementById('video');
+let hasVideo=false;
+
+function sampleModel(){
+  const emo=[]; [[0,6,'neutral'],[6,7.5,'happiness'],[7.5,13,'neutral'],[13,14.2,'surprise'],
+    [14.2,20,'neutral'],[20,21.5,'happiness'],[21.5,25.5,'neutral'],[25.5,26.4,'sadness'],
+    [26.4,30,'neutral']].forEach(([a,b,l])=>emo.push({t0:a,t1:b,label:l}));
+  const eye=[]; let prev=0;
+  [[2,4.5],[9,11.2],[15.5,17],[22.5,24],[27.5,28.6]].forEach(([a,b])=>{
+    if(a>prev)eye.push({t0:prev,t1:a,looking:0}); eye.push({t0:a,t1:b,looking:1}); prev=b;});
+  if(prev<30)eye.push({t0:prev,t1:30,looking:0});
+  const speech=[{t0:0.4,t1:5.6,text:"so the main thing I focus on is",conf:.86},
+    {t0:6.2,t1:12.3,text:"getting the process right first",conf:.84},
+    {t0:12.9,t1:13.8,text:"um",conf:.63},
+    {t0:14.4,t1:20.1,text:"the particular things that stand out",conf:.87},
+    {t0:20.9,t1:26,text:"this video is going to teach",conf:.71},
+    {t0:26.7,t1:29.9,text:"you exactly how it works",conf:.85}];
+  const pauses=[{t0:5.6,t1:6.2,dur:.6},{t0:12.3,t1:12.9,dur:.6},{t0:20.1,t1:20.9,dur:.8},{t0:26,t1:26.7,dur:.7}];
+  return {domain:[0,30],emo,eye,speech,pauses};
+}
+
+function classify(fields){const f=fields.map(x=>x.toLowerCase());
+  if(f.includes('looking_at_camera'))return'eye';
+  if(f.includes('emotion'))return'emotion';
+  if(f.includes('text')&&f.includes('confidence'))return'speech';
+  if(f.includes('is_long')||(f.includes('duration')&&f.includes('start_seconds')&&!f.includes('text')))return'pauses';
+  return'unknown';}
+const num=v=>{const x=parseFloat(v);return isNaN(x)?null:x;};
+function dominantFace(rows){const c={};rows.forEach(r=>{const id=r.face_id;if(id!=null)c[id]=(c[id]||0)+1;});
+  let b=null,bn=-1;for(const k in c)if(c[k]>bn){bn=c[k];b=k;}return b;}
+function mergeRuns(rows,tKey,vKey){
+  const pts=rows.map(r=>({t:num(r[tKey]),v:r[vKey]})).filter(p=>p.t!=null).sort((a,b)=>a.t-b.t);
+  const segs=[];if(!pts.length)return segs;let s=pts[0].t,c=pts[0].v;
+  for(let i=1;i<pts.length;i++)if(pts[i].v!==c){segs.push({t0:s,t1:pts[i].t,v:c});s=pts[i].t;c=pts[i].v;}
+  const last=pts[pts.length-1].t,med=pts.length>1?(last-pts[0].t)/(pts.length-1):.05;
+  segs.push({t0:s,t1:last+med,v:c});return segs;}
+
+let DATA_START=null;
+function buildFromFiles(p){
+  const m={domain:null,emo:[],eye:[],speech:[],pauses:[]};let tmin=Infinity,tmax=-Infinity;
+  const bump=(a,b)=>{tmin=Math.min(tmin,a);tmax=Math.max(tmax,b);};
+  if(p.emotion){const rows=p.emotion,tK=Object.keys(rows[0])[0],fc=dominantFace(rows);
+    mergeRuns(rows.filter(r=>r.face_id==fc),tK,'emotion').forEach(s=>{if(s.v){m.emo.push({t0:s.t0,t1:s.t1,label:s.v});bump(s.t0,s.t1);}});}
+  if(p.eye){const rows=p.eye,tK=Object.keys(rows[0])[0],fc=dominantFace(rows);
+    mergeRuns(rows.filter(r=>r.face_id==fc),tK,'looking_at_camera').forEach(s=>{m.eye.push({t0:s.t0,t1:s.t1,looking:(s.v==='1'||s.v===1)?1:0});bump(s.t0,s.t1);});}
+  if(p.speech)p.speech.forEach(r=>{const a=num(r.start_seconds),b=num(r.end_seconds);
+    if(a!=null&&b!=null){m.speech.push({t0:a,t1:b,text:(r.text||'').trim(),conf:num(r.confidence)});bump(a,b);}});
+  if(p.pauses)p.pauses.forEach(r=>{const a=num(r.start_seconds),b=num(r.end_seconds);
+    if(a!=null&&b!=null)m.pauses.push({t0:a,t1:b,dur:num(r.duration)||(b-a)});});
+  if(tmin===Infinity)return null;
+  DATA_START=tmin; m.domain=[Math.floor(tmin),Math.ceil(tmax)];return m;}
+
+/* ---- rendering ---- */
+const svg=document.getElementById('chart'),NS='http://www.w3.org/2000/svg';
+const W=640,H=300,PADL=78,PADR=14,PADT=12,PADB=26;
+const lanes=[{key:'emo',label:'EMOTION',y:PADT+4,h:54},
+  {key:'eye',label:'EYE',y:PADT+72,h:36},
+  {key:'speech',label:'SPEECH',y:PADT+124,h:48},
+  {key:'pause',label:'PAUSE',y:PADT+186,h:16}];
+let MODEL=null,X=null,cursorLine,cursorNode;
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function niceStep(s){const raw=s/6,pw=Math.pow(10,Math.floor(Math.log10(raw)));
+  return[1,2,2.5,5,10].map(x=>x*pw).find(x=>x>=raw)||10*pw;}
+function render(model){
+  MODEL=model;svg.innerHTML='';const[t0,t1]=model.domain,span=Math.max(.001,t1-t0),plotW=W-PADL-PADR;
+  X=t=>PADL+(t-t0)/span*plotW;
+  lanes.forEach(L=>{el('rect',{x:PADL,y:L.y,width:plotW,height:L.h,rx:5,class:'lane-bg'},svg);
+    el('text',{x:PADL-10,y:L.y+L.h/2+4,'text-anchor':'end',class:'lane-label'},svg).textContent=L.label;});
+  const step=niceStep(span);
+  for(let t=Math.ceil(t0/step)*step;t<=t1+1e-6;t+=step){const x=X(t);
+    el('line',{x1:x,y1:PADT,x2:x,y2:H-PADB,class:'grid-line'},svg);
+    el('text',{x:x,y:H-PADB+16,'text-anchor':'middle',class:'tick-label'},svg).textContent=t.toFixed(step<1?1:0)+'s';}
+  el('line',{x1:PADL,y1:H-PADB+2,x2:W-PADR,y2:H-PADB+2,class:'axis-line'},svg);
+  const Le=lanes[0];model.emo.forEach(s=>{const x=X(s.t0),w=Math.max(1,X(s.t1)-X(s.t0));
+    el('rect',{x,y:Le.y,width:w,height:Le.h,rx:3,fill:emoColor(s.label),opacity:.9},svg);
+    if(w>40)el('text',{x:x+5,y:Le.y+Le.h/2+4,class:'tick-label',fill:'#fff'},svg).textContent=s.label;});
+  const Ly=lanes[1];model.eye.forEach(s=>{const x=X(s.t0),w=Math.max(1,X(s.t1)-X(s.t0));
+    el('rect',{x,y:Ly.y,width:w,height:Ly.h,rx:3,fill:s.looking?cssv('--eye'):cssv('--eye-off'),opacity:s.looking?.95:.6},svg);});
+  const Ls=lanes[2];model.speech.forEach(s=>{const x=X(s.t0),w=Math.max(1,X(s.t1)-X(s.t0));
+    const c=(s.conf==null)?.7:s.conf,bh=Math.max(6,Ls.h*Math.min(1,Math.max(.15,c)));
+    el('rect',{x,y:Ls.y+(Ls.h-bh),width:w,height:bh,rx:3,fill:cssv('--speech'),opacity:.9},svg);});
+  el('line',{x1:PADL,y1:Ls.y+Ls.h,x2:PADL+plotW,y2:Ls.y+Ls.h,class:'axis-line'},svg);
+  const Lp=lanes[3];model.pauses.forEach(s=>{const x=X(s.t0),w=Math.max(2,X(s.t1)-X(s.t0));
+    el('rect',{x,y:Lp.y,width:w,height:Lp.h,rx:2,fill:cssv('--pause'),opacity:.85},svg);});
+  cursorLine=el('line',{x1:PADL,y1:PADT,x2:PADL,y2:H-PADB,class:'cursor-line'},svg);
+  cursorNode=el('circle',{cx:PADL,cy:PADT,r:4.5,class:'cursor-node'},svg);
+  buildLegend();buildStats(model);setCursorTime(t0);
+}
+function setCursorTime(t,fromVideo){
+  const[t0,t1]=MODEL.domain;t=Math.max(t0,Math.min(t1,t));
+  const x=X(t);cursorLine.setAttribute('x1',x);cursorLine.setAttribute('x2',x);cursorNode.setAttribute('cx',x);
+  document.getElementById('scrub').value=Math.round((t-t0)/(t1-t0)*1000);
+  updateReadout(t);
+  if(hasVideo&&!fromVideo){const vt=t-OFFSET; if(isFinite(vt)&&Math.abs(video.currentTime-vt)>0.15)video.currentTime=Math.max(0,vt);}
+}
+const findAt=(a,t)=>a.find(s=>t>=s.t0&&t<s.t1);
+function updateReadout(t){
+  document.getElementById('ro-time').textContent=t.toFixed(2)+' s';
+  const e=findAt(MODEL.emo,t);document.getElementById('ro-emo').innerHTML=e?`<span class="dot" style="background:${emoColor(e.label)}"></span>${e.label}`:'—';
+  const y=findAt(MODEL.eye,t);document.getElementById('ro-eye').innerHTML=y?(y.looking?`<span class="dot" style="background:${cssv('--eye')}"></span>看鏡頭`:`<span class="dot" style="background:${cssv('--eye-off')}"></span>沒看`):'—';
+  const s=findAt(MODEL.speech,t),p=findAt(MODEL.pauses,t),so=document.getElementById('ro-speech');
+  if(s)so.innerHTML=`<span class="dot" style="background:${cssv('--speech')}"></span><span class="txt">“${s.text||'…'}”</span>`;
+  else if(p)so.innerHTML=`<span class="dot" style="background:${cssv('--pause')}"></span><span class="txt">停頓 ${p.dur?p.dur.toFixed(1)+'s':''}</span>`;
+  else so.innerHTML='<span class="txt">靜默</span>';
+}
+function buildLegend(){const emos=[...new Set(MODEL.emo.map(s=>s.label))];
+  document.getElementById('legend').innerHTML=[...emos.map(e=>`<span><i class="sw" style="background:${emoColor(e)}"></i>${e}</span>`),
+    `<span><i class="sw" style="background:${cssv('--eye')}"></i>看鏡頭</span>`,
+    `<span><i class="sw" style="background:${cssv('--speech')}"></i>說話(高=信心)</span>`,
+    `<span><i class="sw" style="background:${cssv('--pause')}"></i>停頓</span>`].join('');}
+function buildStats(m){const[t0,t1]=m.domain,span=t1-t0;
+  const eyeLook=m.eye.filter(s=>s.looking).reduce((a,s)=>a+(s.t1-s.t0),0),eyeTot=m.eye.reduce((a,s)=>a+(s.t1-s.t0),0)||1;
+  const speak=m.speech.reduce((a,s)=>a+(s.t1-s.t0),0);
+  const confs=m.speech.map(s=>s.conf).filter(x=>x!=null),mc=confs.length?confs.reduce((a,b)=>a+b,0)/confs.length:null;
+  const ec={};m.emo.forEach(s=>ec[s.label]=(ec[s.label]||0)+(s.t1-s.t0));const te=Object.entries(ec).sort((a,b)=>b[1]-a[1])[0];
+  const cards=[['時間窗',span.toFixed(1)+'s',`${t0}–${t1} 秒`],['眼神接觸',(eyeLook/eyeTot*100).toFixed(0)+'%','看鏡頭佔比'],
+    ['說話佔比',(speak/span*100).toFixed(0)+'%',`${m.speech.length} 段`],['平均信心',mc!=null?mc.toFixed(2):'—','ASR 替代指標'],
+    ['停頓',m.pauses.length+' 次','≥0.25s'],['主要情緒',te?te[0]:'—',te?`佔 ${(te[1]/span*100).toFixed(0)}%`:'']];
+  document.getElementById('stats').innerHTML=cards.map(([k,v,s])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');}
+
+/* ---- interaction ---- */
+function svgX(evt){const r=svg.getBoundingClientRect();const cx=(evt.touches?evt.touches[0].clientX:evt.clientX)-r.left;return cx/r.width*W;}
+function seekFromPx(px){const[t0,t1]=MODEL.domain;const c=Math.max(PADL,Math.min(W-PADR,px));setCursorTime(t0+(c-PADL)/(W-PADL-PADR)*(t1-t0));}
+let dragging=false;
+svg.addEventListener('mousedown',e=>{dragging=true;seekFromPx(svgX(e));});
+svg.addEventListener('mousemove',e=>{if(dragging)seekFromPx(svgX(e));});
+window.addEventListener('mouseup',()=>dragging=false);
+svg.addEventListener('touchstart',e=>seekFromPx(svgX(e)),{passive:true});
+svg.addEventListener('touchmove',e=>seekFromPx(svgX(e)),{passive:true});
+document.getElementById('scrub').addEventListener('input',e=>{const[t0,t1]=MODEL.domain;setCursorTime(t0+e.target.value/1000*(t1-t0));});
+
+/* play: prefers video clock if present */
+let playing=false,raf=null,playT=0,last=0;
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function setPlayIcon(){document.getElementById('playIcon').innerHTML=playing
+  ?'<rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/>'
+  :'<path d="M3 2l9 5-9 5z" fill="currentColor"/>';}
+function togglePlay(){
+  if(hasVideo){ if(video.paused)video.play(); else video.pause(); return; }
+  playing=!playing;setPlayIcon();
+  if(playing){const[t0,t1]=MODEL.domain;const sv=+document.getElementById('scrub').value;
+    playT=sv>=999?t0:t0+sv/1000*(t1-t0);last=performance.now();loop();}
+  else if(raf)cancelAnimationFrame(raf);
+}
+function loop(){const[t0,t1]=MODEL.domain,now=performance.now(),dt=(now-last)/1000;last=now;
+  playT+=dt*(reduce?(t1-t0):(t1-t0)/9);
+  if(playT>=t1){playT=t1;setCursorTime(playT);playing=false;setPlayIcon();return;}
+  setCursorTime(playT);raf=requestAnimationFrame(loop);}
+document.getElementById('play').addEventListener('click',togglePlay);
+
+/* video wiring: video clock drives the cursor */
+video.addEventListener('timeupdate',()=>{ if(hasVideo)setCursorTime(video.currentTime+OFFSET,true); });
+video.addEventListener('play',()=>{playing=true;setPlayIcon();});
+video.addEventListener('pause',()=>{playing=false;setPlayIcon();});
+document.getElementById('vid').addEventListener('change',ev=>{
+  const f=ev.target.files[0];if(!f)return;
+  video.src=URL.createObjectURL(f);video.style.display='block';
+  document.getElementById('vidhint').style.display='none';hasVideo=true;
+  document.getElementById('datatag').innerHTML='目前:已載入影片。播放影片,時間軸游標會同步移動。';
+});
+
+/* offset controls */
+function computeAutoOffset(){
+  // 完整原片(影片長度 >= 資料結束)→ 偏移 0,並把影片跳到分析區段起點。
+  // 已剪片段(影片較短)→ 偏移 = 資料起始絕對秒數,讓資料起點對到影片 0 秒。
+  if(!MODEL||DATA_START==null){OFFSET=0;document.getElementById('offset').value='0';return;}
+  const dEnd=MODEL.domain[1];
+  if(hasVideo&&isFinite(video.duration)&&video.duration<dEnd-0.5){
+    OFFSET=DATA_START;
+  }else{
+    OFFSET=0;
+    if(hasVideo&&isFinite(video.duration)){try{video.currentTime=DATA_START;}catch(e){}}
+  }
+  document.getElementById('offset').value=OFFSET.toFixed(1);
+  if(MODEL)setCursorTime(DATA_START||MODEL.domain[0]);
+}
+document.getElementById('offset').addEventListener('input',e=>{const v=parseFloat(e.target.value);if(!isNaN(v))OFFSET=v;});
+document.getElementById('autoOffset').addEventListener('click',computeAutoOffset);
+video.addEventListener('loadedmetadata',computeAutoOffset);
+
+/* CSV loading */
+document.getElementById('files').addEventListener('change',ev=>{
+  const files=[...ev.target.files];if(!files.length)return;
+  const err=document.getElementById('err');err.textContent='';const parsed={};let done=0;
+  files.forEach(file=>Papa.parse(file,{header:true,skipEmptyLines:true,dynamicTyping:false,
+    transformHeader:h=>h.replace(/^\ufeff/,'').trim(),complete:res=>{
+    const kind=classify(res.meta.fields||[]);if(kind!=='unknown')parsed[kind]=res.data;
+    if(++done===files.length){const m=buildFromFiles(parsed);
+      if(!m){err.textContent='讀不到有效資料,請確認選到各步驟輸出的 CSV。';return;}
+      const got=[];if(parsed.emotion)got.push('情緒');if(parsed.eye)got.push('眼神');if(parsed.speech)got.push('說話');if(parsed.pauses)got.push('停頓');
+      render(m); computeAutoOffset();
+      document.getElementById('datatag').innerHTML='目前:<b>你的資料</b> — 已載入 '+got.join('、')+
+        `。對齊偏移 ${OFFSET.toFixed(1)}s(自動判斷)。若影片與資料錯開,微調偏移即可。`;}
+  }}));
+});
+document.getElementById('sampleBtn').addEventListener('click',()=>{
+  OFFSET=0;document.getElementById('offset').value='0';
+  document.getElementById('datatag').innerHTML='目前:<b>範例資料</b>。載入影片與 CSV 後兩者會同步。';
+  render(sampleModel());
+});
+
+document.getElementById('note').innerHTML=
+  '<b>怎麼用:</b>載入影片 +（同時選取)你的 <code>_emotions.csv</code>、<code>_eyecontact.csv</code>、'+
+  '<code>_segments.csv</code>、<code>_pauses.csv</code>。播放影片時,時間軸游標會同步移動;'+
+  '點時間軸任一點,影片也會跳到那一刻。<br><br><b>對齊:</b>CSV 時間戳是影片絕對秒數(例如 60–90s),'+
+  '載入時會自動用資料起點對齊。若你的影片是「完整原片」,偏移設 0;若影片是「已剪好的片段」,'+
+  '按「自動對齊」讓資料起點對到影片 0 秒。';
+
+render(sampleModel());
+</script>
+</body>
+</html>
