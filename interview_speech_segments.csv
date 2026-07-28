@@ -1,0 +1,6 @@
+﻿start_seconds,end_seconds,duration,speaker,text,confidence,avg_logprob,no_speech_prob,n_chars,n_words,rate_chars_per_sec,rate_words_per_sec,gap_before,rms_dbfs,n_word_tokens,low_word_ratio
+60.000,65.380,5.380,unknown,process is the same these are my particular ones that I go through and the,0.8676,-0.1420,0.6299,0,15,0.00,2.79,0.000,-28.5,15,0.133
+65.380,73.580,8.200,unknown,things that stand out to me as one of the the key members of my company so you,0.8676,-0.1420,0.6299,0,18,0.00,2.20,0.000,-29.7,18,0.056
+73.580,80.000,6.420,unknown,know I just wanted to kind of let that know the things may be changed as far,0.8676,-0.1420,0.6299,0,17,0.00,2.65,0.000,-29.0,17,0.118
+80.000,87.380,7.380,unknown,as how the interview process goes but you know you can pretty much bet that,0.8676,-0.1420,0.6299,0,15,0.00,2.03,0.000,-27.0,15,0.000
+87.380,89.900,2.520,unknown,this video right here is going to teach,0.6292,-0.4632,0.2545,0,8,0.00,3.17,0.000,-26.9,8,0.125
