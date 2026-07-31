@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>治療師 POV — 影片即時疊圖</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F8FA;--panel:#FFFFFF;--ink:#161C27;--muted:#6B7686;--hair:#E3E7EE;--hair2:#EFF2F6;
+    --emo-neutral:#94A0B3;--emo-happiness:#E39B2E;--emo-sadness:#4F79C7;--emo-anger:#D24E39;
+    --emo-surprise:#8A6FC9;--emo-disgust:#5FA65C;--emo-fear:#C77FB0;--emo-contempt:#B08A4A;--emo-uncertain:#C6CCD6;
+    --eye:#2ECD78;--eye-off:#E8A32D;--node:#12B5D6;
+    --shadow:0 1px 2px rgba(20,28,39,.05),0 8px 24px rgba(20,28,39,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0E1319;--panel:#151B23;--ink:#E7ECF3;--muted:#8A96A8;--hair:#242C37;--hair2:#1C232C;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 30px rgba(0,0,0,.35);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:24px}
+  .wrap{max-width:960px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  h1{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:26px;letter-spacing:-.01em;margin:0}
+  h1 .thin{color:var(--muted);font-weight:400}
+  .load{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;border:1px solid var(--hair);
+    background:var(--panel);color:var(--ink);padding:9px 14px;border-radius:9px;cursor:pointer;box-shadow:var(--shadow)}
+  .btn:hover{border-color:var(--muted)} .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  input[type=file]{display:none}
+  .datatag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin:12px 0 4px}
+  .datatag b{color:var(--eye)}
+  .err{color:var(--emo-anger);font-family:'IBM Plex Mono',monospace;font-size:12px;min-height:16px;margin:6px 0}
+
+  .player{background:var(--panel);border:1px solid var(--hair);border-radius:14px;box-shadow:var(--shadow);
+    padding:14px;margin-top:8px}
+  .screen{position:relative;width:100%;background:#000;border-radius:10px;overflow:hidden;
+    aspect-ratio:16/9;display:grid;place-items:center}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .hint{color:#8A96A8;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:center;padding:20px;line-height:1.8;z-index:1}
+  .hint .big{font-size:30px;color:#c4ccd6;margin-bottom:6px}
+
+  .bar{display:flex;align-items:center;gap:12px;padding:12px 4px 4px}
+  .play{width:40px;height:40px;border-radius:50%;border:1px solid var(--hair);background:var(--ink);
+    color:var(--paper);cursor:pointer;display:grid;place-items:center;flex:none}
+  .play:active{transform:translateY(1px)}
+  .track{flex:1;position:relative}
+  input[type=range]{width:100%;accent-color:var(--node)}
+  .time{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);white-space:nowrap}
+  .offset{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);padding:2px 4px 0}
+  .offset input{width:74px;font-family:'IBM Plex Mono',monospace;font-size:12px;border:1px solid var(--hair);
+    border-radius:6px;padding:4px 6px;background:var(--panel);color:var(--ink)}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px}
+  .stat{background:var(--panel);border:1px solid var(--hair);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
+  .stat .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;margin-top:4px;display:flex;align-items:center;gap:7px}
+  .dot{width:11px;height:11px;border-radius:50%;flex:none}
+  .stat .s{font-size:12px;color:var(--muted);margin-top:2px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;padding:12px 2px 0}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .note{font-size:12.5px;color:var(--muted);margin-top:16px;line-height:1.6}
+  .note code{font-family:'IBM Plex Mono',monospace;background:var(--hair2);padding:1px 5px;border-radius:4px}
+  .note b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">治療師 POV · 影片即時疊圖</p>
+      <h1>播放即分析 <span class="thin">/ emotion · eye contact</span></h1>
+    </div>
+    <div class="load">
+      <label class="btn primary" for="vid">載入影片</label><input type="file" id="vid" accept="video/*">
+      <label class="btn" for="files">載入 CSV</label><input type="file" id="files" accept=".csv" multiple>
+    </div>
+  </header>
+  <p class="datatag" id="datatag">載入影片 +（一次選取)<code>_emotions.csv</code>、<code>_eyecontact.csv</code> 與 <code>_speech_segments.csv</code>,播放時就會把情緒、眼神疊在臉上,並在下方顯示即時字幕。</p>
+  <div class="err" id="err"></div>
+
+  <div class="player">
+    <div class="screen" id="screen">
+      <div class="hint" id="hint"><div class="big">▶</div>載入影片與 CSV<br>播放時自動在臉上疊出情緒與眼神</div>
+      <video id="video" playsinline style="display:none"></video>
+      <canvas id="cv" style="display:none"></canvas>
+    </div>
+    <div class="bar">
+      <button class="play" id="play" aria-label="播放"><svg width="14" height="14" viewBox="0 0 14 14" id="pi"><path d="M3 2l9 5-9 5z" fill="currentColor"/></svg></button>
+      <div class="track"><input type="range" id="scrub" min="0" max="1000" value="0"></div>
+      <span class="time" id="time">00:00 / 00:00</span>
+    </div>
+    <div class="offset">資料↔影片 對齊偏移 <input type="number" id="offset" step="0.1" value="0"> 秒
+      <button class="btn" id="autoOffset" style="padding:4px 9px;font-size:11px">自動對齊</button></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <p class="note" id="note"></p>
+</div>
+
+<script>
+"use strict";
+const EMO_ZH={neutral:'中性',happiness:'開心',surprise:'驚訝',sadness:'難過',anger:'生氣',
+  disgust:'厭惡',fear:'害怕',contempt:'輕蔑',uncertain:'不確定'};
+const EMO_VAR={neutral:'--emo-neutral',happiness:'--emo-happiness',surprise:'--emo-surprise',
+  sadness:'--emo-sadness',anger:'--emo-anger',disgust:'--emo-disgust',fear:'--emo-fear',
+  contempt:'--emo-contempt',uncertain:'--emo-uncertain'};
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const num=v=>{const x=parseFloat(v);return isNaN(x)?null:x;};
+
+const video=document.getElementById('video'), cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let FRAMES=[], SEGMENTS=[], DOMAIN=null, DATA_START=null, OFFSET=0, hasVideo=false, nativeW=0, nativeH=0;
+
+/* ---------- CSV → 每幀 faces ---------- */
+function classify(f){f=f.map(x=>x.toLowerCase());
+  if(f.includes('looking_at_camera'))return'eye';
+  if(f.includes('emotion'))return'emotion';
+  if(f.includes('text')&&f.includes('start_seconds'))return'speech';return'other';}
+function ingest(parsed){
+  const emo=parsed.emotion||[], eye=parsed.eye||[];
+  const eyeMap={}; eye.forEach(r=>{eyeMap[r.frame_idx+':'+r.face_id]=r;});
+  const byFrame={}; let t0=Infinity,t1=-Infinity;
+  const tKey=emo.length?Object.keys(emo[0])[0]:null;
+  emo.forEach(r=>{
+    const t=num(r[tKey]); if(t==null)return;
+    const fi=r.frame_idx, fid=r.face_id;
+    const x=num(r.x),y=num(r.y),w=num(r.w),h=num(r.h); if(x==null)return;
+    const er=eyeMap[fi+':'+fid];
+    const looking=er?(er.looking_at_camera==='1'||er.looking_at_camera===1):false;
+    (byFrame[fi]=byFrame[fi]||{t,faces:[]}).faces.push(
+      {x,y,w,h,id:fid,emotion:(r.emotion||'uncertain'),looking});
+    t0=Math.min(t0,t);t1=Math.max(t1,t);
+  });
+  const frames=Object.values(byFrame).sort((a,b)=>a.t-b.t);
+  if(!frames.length)return null;
+  DATA_START=t0; DOMAIN=[t0,t1]; return frames;
+}
+function facesAt(dt){
+  if(!FRAMES.length)return[];
+  let lo=0,hi=FRAMES.length-1,best=0;
+  while(lo<=hi){const m=(lo+hi)>>1; if(FRAMES[m].t<=dt){best=m;lo=m+1;}else hi=m-1;}
+  // 取最接近的一幀
+  let cand=best; if(best+1<FRAMES.length && Math.abs(FRAMES[best+1].t-dt)<Math.abs(FRAMES[best].t-dt))cand=best+1;
+  return Math.abs(FRAMES[cand].t-dt)<0.4 ? FRAMES[cand].faces : [];
+}
+function buildSegments(rows){
+  if(!rows)return[];
+  return rows.map(r=>({t0:num(r.start_seconds),t1:num(r.end_seconds),text:(r.text||'').trim()}))
+    .filter(s=>s.t0!=null&&s.t1!=null&&s.text).sort((a,b)=>a.t0-b.t0);
+}
+function segAt(dt){
+  for(const s of SEGMENTS){ if(dt>=s.t0&&dt<s.t1)return s; if(s.t0>dt)break; }
+  return null;
+}
+function wrapText(c,text,maxW){
+  const lines=[]; let line='';
+  for(const ch of text){
+    const test=line+ch;
+    if(c.measureText(test).width>maxW && line){lines.push(line); line=ch;}
+    else line=test;
+  }
+  if(line)lines.push(line);
+  return lines.slice(0,3);
+}
+
+/* ---------- 疊圖(canvas 用原生座標繪製)---------- */
+function draw(){
+  if(!hasVideo||!nativeW){return;}
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const dt=video.currentTime+OFFSET;
+  const faces=facesAt(dt);
+  const fpx=Math.max(15,Math.round(nativeH*0.040));
+  ctx.font=`600 ${fpx}px 'Space Grotesk','Inter',system-ui,sans-serif`;
+  ctx.textBaseline='alphabetic';
+  faces.forEach(f=>{
+    const col=f.looking?cssv('--eye'):cssv('--eye-off');
+    const lw=Math.max(2,Math.round(nativeH*0.005));
+    ctx.strokeStyle=col; ctx.lineWidth=lw;
+    ctx.strokeRect(f.x,f.y,f.w,f.h);
+    const emo=EMO_ZH[f.emotion]||f.emotion;
+    const eye=f.looking?'看鏡頭':'沒看';
+    const txt=`${emo}  ·  ${eye}`;
+    const tw=ctx.measureText(txt).width, pad=Math.round(fpx*0.35);
+    let by=f.y-fpx-2*pad; if(by<0)by=f.y+2;
+    ctx.fillStyle=col; ctx.fillRect(f.x,by,tw+2*pad,fpx+2*pad);
+    ctx.fillStyle='#fff'; ctx.fillText(txt,f.x+pad,by+fpx+pad*0.5);
+  });
+  const m=Math.round(nativeW*0.03), barH=Math.max(4,Math.round(nativeH*0.014));
+  const y0=nativeH-barH-Math.round(nativeH*0.03);
+  // 即時字幕(時間條上方)
+  const seg=segAt(dt);
+  if(seg&&seg.text){
+    const cfs=Math.max(14,Math.round(nativeH*0.038));
+    ctx.font=`500 ${cfs}px 'Inter',system-ui,sans-serif`;
+    const lines=wrapText(ctx,seg.text,nativeW*0.80);
+    const lh=Math.round(cfs*1.32), padX=Math.round(cfs*0.7), padY=Math.round(cfs*0.45);
+    let tw=0; lines.forEach(l=>tw=Math.max(tw,ctx.measureText(l).width));
+    const boxW=tw+2*padX, boxH=lines.length*lh+2*padY;
+    const bx=(nativeW-boxW)/2, byy=y0-Math.round(nativeH*0.028)-boxH;
+    ctx.fillStyle='rgba(10,14,20,.64)';
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(bx,byy,boxW,boxH,Math.round(cfs*0.3));ctx.fill();}
+    else ctx.fillRect(bx,byy,boxW,boxH);
+    ctx.fillStyle='#fff'; ctx.textAlign='center';
+    lines.forEach((l,i)=>ctx.fillText(l,nativeW/2,byy+padY+lh*(i+0.78)));
+    ctx.textAlign='left';
+  }
+  // 底部時間條
+  ctx.fillStyle='rgba(255,255,255,.28)'; ctx.fillRect(m,y0,nativeW-2*m,barH);
+  const prog=DOMAIN?Math.min(1,Math.max(0,(dt-DOMAIN[0])/(DOMAIN[1]-DOMAIN[0]||1))):0;
+  ctx.fillStyle=cssv('--node'); ctx.fillRect(m,y0,(nativeW-2*m)*prog,barH);
+}
+function fmt(s){s=Math.max(0,s|0);return `${String(s/60|0).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
+function tick(){
+  if(hasVideo){
+    document.getElementById('scrub').value=video.duration?Math.round(video.currentTime/video.duration*1000):0;
+    document.getElementById('time').textContent=`${fmt(video.currentTime)} / ${fmt(video.duration||0)}`;
+    draw();
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ---------- 對齊偏移 ---------- */
+function computeAutoOffset(){
+  if(DATA_START==null){OFFSET=0;}
+  else if(hasVideo&&isFinite(video.duration)&&DOMAIN&&video.duration<DOMAIN[1]-0.5){OFFSET=DATA_START;}
+  else{OFFSET=0; if(hasVideo&&DATA_START!=null){try{video.currentTime=DATA_START;}catch(e){}}}
+  document.getElementById('offset').value=OFFSET.toFixed(1);
+}
+document.getElementById('offset').addEventListener('input',e=>{const v=parseFloat(e.target.value);if(!isNaN(v))OFFSET=v;});
+document.getElementById('autoOffset').addEventListener('click',computeAutoOffset);
+
+/* ---------- 載入影片 ---------- */
+document.getElementById('vid').addEventListener('change',ev=>{
+  const f=ev.target.files[0]; if(!f)return;
+  video.src=URL.createObjectURL(f); video.style.display='block'; cv.style.display='block';
+  document.getElementById('hint').style.display='none'; hasVideo=true;
+});
+video.addEventListener('loadedmetadata',()=>{
+  nativeW=video.videoWidth; nativeH=video.videoHeight;
+  cv.width=nativeW; cv.height=nativeH;
+  document.getElementById('screen').style.aspectRatio=`${nativeW} / ${nativeH}`;
+  computeAutoOffset();
+  document.getElementById('datatag').innerHTML='已載入影片。播放時情緒與眼神會即時疊在臉上。';
+});
+
+/* ---------- 載入 CSV ---------- */
+document.getElementById('files').addEventListener('change',ev=>{
+  const files=[...ev.target.files]; if(!files.length)return;
+  const err=document.getElementById('err'); err.textContent=''; const parsed={}; let done=0;
+  files.forEach(file=>Papa.parse(file,{header:true,skipEmptyLines:true,dynamicTyping:false,
+    transformHeader:h=>h.replace(/^\ufeff/,'').trim(),complete:res=>{
+      const k=classify(res.meta.fields||[]); if(k!=='other')parsed[k]=res.data;
+      if(++done===files.length){
+        const fr=ingest(parsed);
+        if(!fr){err.textContent='讀不到有效資料,請確認選到 _emotions.csv 與 _eyecontact.csv。';return;}
+        FRAMES=fr; SEGMENTS=buildSegments(parsed.speech); computeAutoOffset(); buildStats(); buildLegend();
+        const got=[];if(parsed.emotion)got.push('情緒');if(parsed.eye)got.push('眼神');if(SEGMENTS.length)got.push('字幕');
+        document.getElementById('datatag').innerHTML='已載入 '+got.join('、')+
+          `。共 ${FRAMES.length} 個分析幀`+(SEGMENTS.length?`、${SEGMENTS.length} 句話`:'')+
+          '。'+(hasVideo?'播放看看!':'再載入影片即可播放。');
+      }
+    }}));
+});
+
+/* ---------- 播放控制 ---------- */
+function setPi(){document.getElementById('pi').innerHTML=video.paused
+  ?'<path d="M3 2l9 5-9 5z" fill="currentColor"/>'
+  :'<rect x="3" y="2" width="3" height="10" fill="currentColor"/><rect x="8" y="2" width="3" height="10" fill="currentColor"/>';}
+document.getElementById('play').addEventListener('click',()=>{if(!hasVideo)return;video.paused?video.play():video.pause();});
+video.addEventListener('play',setPi); video.addEventListener('pause',setPi);
+document.getElementById('scrub').addEventListener('input',e=>{if(hasVideo&&video.duration)video.currentTime=e.target.value/1000*video.duration;});
+video.addEventListener('seeked',draw);
+
+/* ---------- 摘要 / 圖例 ---------- */
+function buildStats(){
+  let look=0,tot=0; const ec={};
+  FRAMES.forEach(fr=>fr.faces.forEach(f=>{
+    ec[f.emotion]=(ec[f.emotion]||0)+1;
+    if(f.emotion!=='uncertain'){tot++; if(f.looking)look++;}
+  }));
+  const te=Object.entries(ec).sort((a,b)=>b[1]-a[1])[0];
+  const span=DOMAIN?(DOMAIN[1]-DOMAIN[0]):0;
+  const cards=[
+    ['分析幀數',FRAMES.length,`時間窗 ${span.toFixed(0)}s`],
+    ['眼神接觸',tot?(look/tot*100).toFixed(0)+'%':'—','看鏡頭佔比',null],
+    ['主要情緒',te?(EMO_ZH[te[0]]||te[0]):'—','',te?te[0]:null],
+  ];
+  document.getElementById('stats').innerHTML=cards.map(([k,v,s,emo])=>{
+    const dot=emo?`<span class="dot" style="background:${cssv(EMO_VAR[emo]||'--emo-uncertain')}"></span>`:'';
+    return `<div class="stat"><div class="k">${k}</div><div class="v">${dot}${v}</div><div class="s">${s}</div></div>`;
+  }).join('');
+}
+function buildLegend(){
+  const emos=[...new Set(FRAMES.flatMap(f=>f.faces.map(x=>x.emotion)))];
+  document.getElementById('legend').innerHTML=[
+    `<span><i class="sw" style="background:${cssv('--eye')}"></i>綠框=看鏡頭</span>`,
+    `<span><i class="sw" style="background:${cssv('--eye-off')}"></i>琥珀框=沒看</span>`,
+    ...emos.map(e=>`<span><i class="sw" style="background:${cssv(EMO_VAR[e]||'--emo-uncertain')}"></i>${EMO_ZH[e]||e}</span>`)
+  ].join('');
+}
+
+document.getElementById('note').innerHTML=
+  '<b>流程:</b>先在本機用 <code>analyze_all.py</code> 跑一次,得到 '+
+  '<code>_emotions.csv</code>、<code>_eyecontact.csv</code> 與 <code>_speech_segments.csv</code>,再連同原影片載入這裡。'+
+  '分析用的是你論文正牌的 Python 管線,所以畫面上的情緒/眼神跟你的資料完全一致。<br><br>'+
+  '<b>對齊:</b>CSV 時間戳是影片絕對秒數。載入完整原片→偏移自動設 0 並跳到分析區段;'+
+  '載入剪好的片段→偏移自動設為資料起始秒數。對不準時手動微調即可。';
+</script>
+</body>
+</html>
